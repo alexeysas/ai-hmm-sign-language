@@ -56,6 +56,7 @@ class ModelSelector(object):
                     best_num_components = n_states
             except BaseException:
                 print("Failed to build model woth n_states={}".format(n_states))
+                #raise
 
         return best_model
 
@@ -153,11 +154,43 @@ class SelectorDIC(ModelSelector):
     DIC = log(P(X(i)) - 1/(M-1)SUM(log(P(X(all but i))
     '''
 
-    def select(self):
-        warnings.filterwarnings("ignore", category=DeprecationWarning)
+    def build_model(self, n_states):
+        '''
+        Select best model based on DIC:
+        http://citeseerx.ist.psu.edu/viewdoc/download?doi=10.1.1.58.6208&rep=rep1&type=pdf
 
-        # TODO implement model selection based on DIC scores
-        raise NotImplementedError
+        DIC = logL - 1 / (M-1) * SUM(logL for all words but current))
+        M is the number of classes (words)
+        p is the number of parameters
+        L is the likelihood of the fitted model
+
+        '''
+
+        # train model
+        model = self.base_model(n_states)
+        model = model.fit(self.X, self.lengths)
+
+        # calculate log-liklyhood for the model
+        log_l_score = model.score(self.X, self.lengths)
+
+        # M is the number of clases
+        M = len(self.words)
+
+        # get all other words
+        other_words = [x for x in self.words.keys() if x != self.this_word]
+
+        log_l_score_sum = 0.0
+
+        for word in other_words:
+            X, lengths = self.hwords[word]
+            log_l_score_sum += model.score(X, lengths)
+
+        # combine score according to the DIC formula
+        score = log_l_score - 1.0 / (M - 1.0) * log_l_score_sum
+
+        # as we are minimizing - need "-" sign
+        return model, -score
+
 
 
 class SelectorCV(ModelSelector):
@@ -187,10 +220,10 @@ class SelectorCV(ModelSelector):
             # calculate log-liklyhood for the model
             log_l_score = model.score(test_set_data, test_set_lengths)
 
-            # collect score to 
+            # collect score to
             scores.append(log_l_score)
 
-        print(np.mean(scores))
-        return model, np.mean(scores)
+        # as we are minimizing - need "-" sign
+        return model, -np.mean(scores)
 
 
