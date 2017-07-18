@@ -38,7 +38,7 @@ class ModelSelector(object):
     def select(self):
         '''
         Enumerate possible parametrs (number of states)
-        and select model with minimum error
+        and select model with minimum error score
         '''
         warnings.filterwarnings("ignore", category=DeprecationWarning)
 
@@ -55,8 +55,9 @@ class ModelSelector(object):
                     best_model = model
                     best_num_components = n_states
             except BaseException:
-                print("Failed to build model woth n_states={}".format(n_states))
+                #print("Failed to build model woth n_states={}".format(n_states))
                 #raise
+                pass
 
         return best_model
 
@@ -124,10 +125,11 @@ class SelectorBIC(ModelSelector):
         # calculate p
         # to calculate p we need to sum up all parameters for the model which are trainables
         # according to the links trainables are: model.startprob_,
-        # model.transmat_, model.covars_, model.means
+        # model.transmat_, model.covars_, model.means_
         # http://hmmlearn.readthedocs.io/en/latest/api.html#hmmlearn-hmm
         # https://github.com/hmmlearn/hmmlearn/blob/master/hmmlearn/hmm.py
-        # as sums of rows are equal to 1 so last parameter is calculated
+
+        # as sums of rows are equal to 1 last parameter is calculated
         # and can not be considered as trainable
         p = np.size(model.transmat_) - np.size(model.transmat_, 0)
 
@@ -222,6 +224,10 @@ class SelectorCV(ModelSelector):
 
             # collect score to
             scores.append(log_l_score)
+
+        #return fully trained model
+        model = self.base_model(n_states)
+        model = model.fit(self.X, self.lengths)
 
         # as we are minimizing - need "-" sign
         return model, -np.mean(scores)
